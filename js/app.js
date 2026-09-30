@@ -19,6 +19,7 @@ import { renderBusinessWizard } from './views/businessWizard.js';
 import { renderBusinessReview } from './views/businessReview.js';
 import { renderAdminDashboard } from './views/adminDashboard.js';
 import { renderProfile } from './views/profile.js';
+import { getCurrentSession, signOutUser, onAuthStateChange } from './supabaseClient.js';
 
 class AppRouter {
   constructor() {
@@ -27,9 +28,29 @@ class AppRouter {
     this.init();
   }
 
-  init() {
+  async init() {
     // Initialize Notification Drawer
     NotificationDrawer.init();
+
+    // Check existing Supabase session
+    try {
+      const session = await getCurrentSession();
+      if (session?.user) {
+        store.syncSupabaseUser(session.user);
+      }
+    } catch (e) {
+      console.warn('Supabase initial session check:', e);
+    }
+
+    // Subscribe to Supabase Auth state changes
+    onAuthStateChange((event, session) => {
+      if (session?.user) {
+        store.syncSupabaseUser(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        store.clearSupabaseUser();
+      }
+      this.updateNavbar();
+    });
 
     // Initial render of navbar
     this.updateNavbar();
@@ -84,9 +105,20 @@ class AppRouter {
       OnboardingModal.open();
     });
 
-    // Bind auth modal
-    document.querySelector('#nav-auth-btn')?.addEventListener('click', () => {
-      AuthModal.open('login', store.state.activeRole === 'business' ? 'business' : 'worker');
+    // Bind auth modal & sign out
+    document.querySelector('#nav-auth-btn')?.addEventListener('click', async () => {
+      if (store.state.authenticatedUser) {
+        try {
+          await signOutUser();
+          store.clearSupabaseUser();
+          Toast.info('Signed Out', 'You have been signed out of ApexTask.');
+          this.updateNavbar();
+        } catch (err) {
+          Toast.error('Sign Out Error', err.message);
+        }
+      } else {
+        AuthModal.open('login', store.state.activeRole === 'business' ? 'business' : 'worker');
+      }
     });
 
     // Bind notification bell
@@ -166,6 +198,27 @@ class AppRouter {
         const workerCash = store.ledger.getBalance(`USER_CASH:${store.state.currentUser.id}`);
         balanceChip.textContent = `₦${workerCash.toLocaleString()}`;
       }
+    }
+
+    // Update auth button label based on Supabase session
+    const authBtn = document.getElementById('nav-auth-btn');
+    if (authBtn) {
+      if (store.state.authenticatedUser) {
+        authBtn.innerHTML = `<span>Sign Out</span>`;
+        authBtn.title = `Signed in as ${store.state.authenticatedUser.email}. Click to sign out.`;
+      } else {
+        authBtn.innerHTML = `<span>Sign In</span>`;
+        authBtn.title = 'Sign In or Register';
+      }
+    }
+
+    // Update avatar initials based on active user
+    const avatarEl = document.querySelector('#nav-user-chip .user-avatar');
+    if (avatarEl) {
+      const activeName = store.state.authenticatedUser?.fullName ||
+        (this.currentRoute.startsWith('business') ? store.state.businessUser.name : store.state.currentUser.name);
+      const initials = activeName.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'U';
+      avatarEl.textContent = initials;
     }
 
     // Update notification unread indicator

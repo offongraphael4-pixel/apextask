@@ -295,6 +295,48 @@ export class AppStore {
     this.saveState();
   }
 
+  // --- Supabase Authentication State Sync ---
+  syncSupabaseUser(supabaseUser, explicitRole) {
+    if (!supabaseUser) return;
+    const meta = supabaseUser.user_metadata || {};
+    const role = explicitRole || meta.role || this.state.activeRole || 'worker';
+    const fullName = meta.full_name || supabaseUser.email?.split('@')[0] || 'User';
+
+    this.state.authenticatedUser = {
+      id: supabaseUser.id,
+      email: supabaseUser.email,
+      fullName,
+      phone: meta.phone || '',
+      role,
+      lastSignIn: supabaseUser.last_sign_in_at
+    };
+
+    if (role === 'business') {
+      this.state.businessUser = {
+        ...this.state.businessUser,
+        id: supabaseUser.id,
+        email: supabaseUser.email,
+        name: fullName
+      };
+      this.state.activeRole = 'business';
+    } else {
+      this.state.currentUser = {
+        ...this.state.currentUser,
+        id: supabaseUser.id,
+        email: supabaseUser.email,
+        name: fullName
+      };
+      this.state.activeRole = 'worker';
+    }
+
+    this.saveState();
+  }
+
+  clearSupabaseUser() {
+    this.state.authenticatedUser = null;
+    this.saveState();
+  }
+
   // --- Task Reservation Engine ---
   reserveTask(taskId) {
     const task = this.state.tasks.find(t => t.id === taskId);

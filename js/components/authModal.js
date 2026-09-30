@@ -7,6 +7,8 @@
 
 import { store } from '../store.js';
 import { Toast } from './toast.js';
+import { signUpUser, signInUser } from '../supabaseClient.js';
+import { isSupabaseConfigured } from '../supabaseConfig.js';
 
 export class AuthModal {
   static open(defaultMode = 'login', defaultRole = 'worker') {
@@ -20,6 +22,8 @@ export class AuthModal {
     let currentRole = defaultRole; // 'worker' | 'business'
 
     function renderContent() {
+      const configured = isSupabaseConfigured();
+
       return `
         <div class="modal-dialog" style="max-width: 440px;">
           <div class="modal-header">
@@ -62,23 +66,23 @@ export class AuthModal {
             ${currentMode === 'register' ? `
               <div class="form-group">
                 <label class="form-label">${currentRole === 'worker' ? 'Full Legal Name' : 'Company / Business Name'}</label>
-                <input type="text" id="auth-name-input" class="form-control" placeholder="${currentRole === 'worker' ? 'e.g. Adeola Johnson' : 'e.g. PayStream Tech Ltd'}" value="${currentRole === 'worker' ? 'Adeola Johnson' : 'PayStream Technologies Ltd'}">
+                <input type="text" id="auth-name-input" class="form-control" placeholder="${currentRole === 'worker' ? 'e.g. Adeola Johnson' : 'e.g. PayStream Tech Ltd'}" required>
               </div>
 
               <div class="form-group">
-                <label class="form-label">Phone Number (For OTP Verification)</label>
-                <input type="tel" id="auth-phone-input" class="form-control" placeholder="+234 814 555 0192" value="+234 814 555 0192">
+                <label class="form-label">Phone Number (Optional)</label>
+                <input type="tel" id="auth-phone-input" class="form-control" placeholder="+234 814 555 0192">
               </div>
             ` : ''}
 
             <div class="form-group">
               <label class="form-label">Email Address</label>
-              <input type="email" id="auth-email-input" class="form-control" placeholder="name@example.com" value="${currentRole === 'worker' ? 'adeola.johnson@example.com' : 'admin@paystream.io'}">
+              <input type="email" id="auth-email-input" class="form-control" placeholder="name@example.com" required autocomplete="email">
             </div>
 
             <div class="form-group">
               <label class="form-label">Password</label>
-              <input type="password" id="auth-password-input" class="form-control" value="••••••••••••">
+              <input type="password" id="auth-password-input" class="form-control" placeholder="Minimum 6 characters" required autocomplete="${currentMode === 'login' ? 'current-password' : 'new-password'}">
             </div>
 
             <button type="button" id="auth-submit-btn" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 0.5rem; box-shadow: var(--shadow-glow-indigo);">
@@ -122,15 +126,88 @@ export class AuthModal {
       });
 
       backdrop.querySelector('#auth-google-btn')?.addEventListener('click', () => {
-        Toast.success('Google OAuth Verified', `Signed in as ${currentRole === 'worker' ? 'Adeola Johnson' : 'PayStream Admin'}.`);
-        AuthModal.close();
+        Toast.info('Google OAuth', 'Google Authentication will be active once configured in your Supabase Auth Providers.');
       });
 
-      backdrop.querySelector('#auth-submit-btn')?.addEventListener('click', () => {
-        Toast.success(currentMode === 'login' ? 'Welcome Back!' : 'Account Created!', `Logged in successfully as ${currentRole === 'worker' ? 'Worker' : 'Business'}.`);
-        store.setRole(currentRole);
-        AuthModal.close();
-        if (window.app) window.app.navigate(currentRole);
+      // Email & Password Submit
+      const submitBtn = backdrop.querySelector('#auth-submit-btn');
+      submitBtn?.addEventListener('click', async () => {
+        const emailInput = backdrop.querySelector('#auth-email-input');
+        const passwordInput = backdrop.querySelector('#auth-password-input');
+        const nameInput = backdrop.querySelector('#auth-name-input');
+        const phoneInput = backdrop.querySelector('#auth-phone-input');
+
+        const email = emailInput ? emailInput.value.trim() : '';
+        const password = passwordInput ? passwordInput.value : '';
+        const fullName = nameInput ? nameInput.value.trim() : '';
+        const phone = phoneInput ? phoneInput.value.trim() : '';
+
+        if (!email || !email.includes('@')) {
+          Toast.error('Invalid Email', 'Please provide a valid email address.');
+          emailInput?.focus();
+          return;
+        }
+
+        if (!password || password.length < 6) {
+          Toast.error('Invalid Password', 'Password must be at least 6 characters.');
+          passwordInput?.focus();
+          return;
+        }
+
+        // If Supabase is configured, authenticate via Supabase
+        if (isSupabaseConfigured()) {
+          const originalText = submitBtn.innerHTML;
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = `<span>⏳ Processing...</span>`;
+
+          try {
+            if (currentMode === 'register') {
+              const data = await signUpUser({
+                email,
+                password,
+                fullName: fullName || (currentRole === 'worker' ? 'ApexTask Contributor' : 'ApexTask Business'),
+                phone,
+                role: currentRole
+              });
+
+              // Check if Supabase requires email confirmation
+              if (data?.user && !data?.session) {
+                Toast.info(
+                  'Verification Email Sent',
+                  `A confirmation link was sent to ${email}. Please check your inbox to complete sign-up.`
+                );
+              } else {
+                Toast.success('Account Created', `Welcome to ApexTask, ${fullName || email}!`);
+                if (data?.user) {
+                  store.syncSupabaseUser(data.user, currentRole);
+                }
+              }
+              AuthModal.close();
+            } else {
+              // Sign in
+              const data = await signInUser({ email, password });
+              Toast.success('Welcome Back!', `Signed in successfully.`);
+              if (data?.user) {
+                store.syncSupabaseUser(data.user, currentRole);
+              }
+              AuthModal.close();
+              if (window.app) window.app.navigate(currentRole);
+            }
+          } catch (err) {
+            console.error('Supabase Auth error:', err);
+            const errorMsg = err.message || 'Authentication failed. Please verify credentials.';
+            Toast.error('Authentication Error', errorMsg);
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+          }
+        } else {
+          // Fallback demo notification if credentials are not yet entered
+          Toast.info(
+            'Supabase Key Required',
+            'Please add your Supabase Project URL & Anon Key to js/supabaseConfig.js to authenticate.'
+          );
+        }
       });
     }
 
