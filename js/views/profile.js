@@ -8,9 +8,18 @@
 import { store } from '../store.js';
 import { Modal } from '../components/modal.js';
 import { Toast } from '../components/toast.js';
+import { signOutUser } from '../supabaseClient.js';
 
 export function renderProfile(container, navigateTo) {
+  const authUser = store.state.authenticatedUser;
   const user = store.state.currentUser;
+
+  const displayName = authUser?.fullName || user.name;
+  const displayEmail = authUser?.email || user.email;
+  const displayPhone = authUser?.phone || user.phone || 'Not provided';
+  const displayRole = authUser?.role ? (authUser.role.charAt(0).toUpperCase() + authUser.role.slice(1)) : 'Worker';
+
+  const initials = displayName.split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'U';
 
   container.innerHTML = `
     <div style="max-width: 800px; margin: 0 auto 3rem;">
@@ -26,25 +35,33 @@ export function renderProfile(container, navigateTo) {
       <div class="card" style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem;">
         <div style="display: flex; align-items: center; gap: 1.25rem;">
           <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, var(--primary-600), var(--success-500)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800; box-shadow: var(--shadow-glow-indigo);">
-            ${user.name.split(' ').map(n => n[0]).join('')}
+            ${initials}
           </div>
           <div>
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <h2 style="font-size: 1.35rem; font-weight: 800;">${user.name}</h2>
-              <span class="badge badge-emerald">✓ Verified Contributor</span>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <h2 style="font-size: 1.35rem; font-weight: 800;">${displayName}</h2>
+              <span class="badge badge-emerald">✓ ${displayRole} Active</span>
+              ${authUser ? '<span class="badge badge-indigo" title="Authenticated with Supabase">⚡ Supabase Auth</span>' : ''}
             </div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
-              ${user.email} • ${user.phone}
+            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
+              ${displayEmail} • ${displayPhone}
             </div>
           </div>
         </div>
 
-        <div style="text-align: right;">
-          <div style="font-size: 0.75rem; color: var(--text-tertiary); text-transform: uppercase;">Trust Reputation Score</div>
-          <div class="num" style="font-size: 2.25rem; font-weight: 800; color: var(--success-400); margin: 2px 0;">
-            ${user.trustScore}/100
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+          <div style="text-align: right;">
+            <div style="font-size: 0.75rem; color: var(--text-tertiary); text-transform: uppercase;">Trust Reputation Score</div>
+            <div class="num" style="font-size: 2.25rem; font-weight: 800; color: var(--success-400); margin: 2px 0;">
+              ${user.trustScore}/100
+            </div>
+            <span class="badge badge-indigo">Top 5% Worker</span>
           </div>
-          <span class="badge badge-indigo">Top 5% Worker</span>
+          ${authUser ? `
+            <button id="profile-signout-btn" class="btn btn-secondary btn-sm" style="font-size: 0.8rem; align-self: center;">
+              Sign Out
+            </button>
+          ` : ''}
         </div>
       </div>
 
@@ -127,6 +144,20 @@ export function renderProfile(container, navigateTo) {
   `;
 
   container.querySelector('#profile-back-btn').addEventListener('click', () => navigateTo('worker'));
+
+  const signoutBtn = container.querySelector('#profile-signout-btn');
+  if (signoutBtn) {
+    signoutBtn.addEventListener('click', async () => {
+      try {
+        await signOutUser();
+        store.clearSupabaseUser();
+        Toast.info('Signed Out', 'You have been signed out.');
+        navigateTo('worker');
+      } catch (err) {
+        Toast.error('Sign Out Error', err.message);
+      }
+    });
+  }
 
   const kycBtn = container.querySelector('#verify-kyc-btn');
   if (kycBtn) {

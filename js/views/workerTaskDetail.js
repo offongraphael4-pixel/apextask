@@ -10,6 +10,7 @@ import { Modal } from '../components/modal.js';
 import { Toast } from '../components/toast.js';
 import { CountdownTimer } from '../components/countdown.js';
 import { FraudShield } from '../fraud.js';
+import { AuthModal } from '../components/authModal.js';
 
 let activeTimerInstance = null;
 
@@ -333,6 +334,17 @@ export function openTaskDetailModal(taskId, onStateChange) {
   const claimBtn = modalEl.querySelector('#claim-task-btn');
   if (claimBtn) {
     claimBtn.addEventListener('click', () => {
+      if (!store.state.authenticatedUser) {
+        Toast.info('Sign In Required', 'Please sign in or create an account to claim tasks and earn rewards.');
+        Modal.close();
+        AuthModal.open('login', 'worker', null, () => {
+          setTimeout(() => {
+            openTaskDetailModal(task.id, onStateChange);
+          }, 300);
+        });
+        return;
+      }
+
       try {
         store.reserveTask(task.id);
         Toast.success('Slot Reserved!', `You have ${task.leaseMinutes} minutes to complete the task.`);

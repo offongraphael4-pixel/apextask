@@ -32,32 +32,48 @@ class AppRouter {
     // Initialize Notification Drawer
     NotificationDrawer.init();
 
-    // Check existing Supabase session
+    // 1. Intercept Supabase Auth Callback URLs (Hash fragments & PKCE query params)
+    this.handleAuthCallbacks();
+
+    // 2. Check existing Supabase session for immediate persistence on page load
     try {
       const session = await getCurrentSession();
       if (session?.user) {
         store.syncSupabaseUser(session.user);
+      } else {
+        // No active session in Supabase storage
+        store.clearSupabaseUser();
       }
     } catch (e) {
       console.warn('Supabase initial session check:', e);
     }
 
-    // Subscribe to Supabase Auth state changes
+    // 3. Subscribe to Supabase Auth state changes
     onAuthStateChange((event, session) => {
       if (session?.user) {
         store.syncSupabaseUser(session.user);
       } else if (event === 'SIGNED_OUT') {
         store.clearSupabaseUser();
+        // If current route is protected, redirect to worker feed
+        if (this.isRouteProtected(this.currentRoute)) {
+          this.navigate('worker');
+        }
       }
       this.updateNavbar();
+      this.renderCurrentView();
     });
 
     // Initial render of navbar
     this.updateNavbar();
 
-    // Listen to hash changes if any
+    // Listen to hash changes with safety checks against auth tokens
     window.addEventListener('hashchange', () => {
-      const route = window.location.hash.replace('#/', '') || 'worker';
+      const hash = window.location.hash;
+      if (hash.includes('access_token=') || hash.includes('error=')) {
+        this.handleAuthCallbacks();
+        return;
+      }
+      const route = this.extractRouteFromHash(hash);
       this.navigate(route, false);
     });
 
@@ -67,7 +83,7 @@ class AppRouter {
     });
 
     // Initial navigation
-    const initialRoute = window.location.hash.replace('#/', '') || 'worker';
+    const initialRoute = this.extractRouteFromHash(window.location.hash);
     this.navigate(initialRoute, false);
 
     // URL parameter triggers for direct modal inspection & snapshots
@@ -112,7 +128,12 @@ class AppRouter {
           await signOutUser();
           store.clearSupabaseUser();
           Toast.info('Signed Out', 'You have been signed out of ApexTask.');
-          this.updateNavbar();
+          if (this.isRouteProtected(this.currentRoute)) {
+            this.navigate('worker');
+          } else {
+            this.updateNavbar();
+            this.renderCurrentView();
+          }
         } catch (err) {
           Toast.error('Sign Out Error', err.message);
         }
@@ -162,7 +183,103 @@ class AppRouter {
     });
   }
 
+  extractRouteFromHash(hash) {
+    if (!hash || hash === '#' || hash === '#/') return 'worker';
+    // Clean hash
+    let clean = hash.replace(/^#\/?/, '').split('?')[0];
+    if (clean.includes('access_token=') || clean.includes('error=')) {
+      return 'worker';
+    }
+    return clean || 'worker';
+  }
+
+  handleAuthCallbacks() {
+    const hash = window.location.hash;
+    const search = window.location.search;
+
+    // Check for auth error in hash fragment
+    if (hash.includes('error=')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const errorDesc = params.get('error_description') || 'Authentication link error';
+      Toast.error('Auth Link Failed', decodeURIComponent(errorDesc.replace(/\+/g, ' ')));
+      window.history.replaceState(null, '', window.location.pathname + '#/worker');
+      return;
+    }
+
+    // Check for access_token confirmation in hash fragment
+    if (hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const type = params.get('type');
+      if (type === 'signup' || type === 'email_confirmation') {
+        Toast.success('Email Verified!', 'Your account has been confirmed successfully. Welcome to ApexTask!');
+      } else if (type === 'recovery') {
+        Toast.info('Password Reset', 'You are signed in via reset link. Please update your password in Profile.');
+      } else {
+        Toast.success('Signed In', 'Authenticated successfully.');
+      }
+      // Clean hash after brief timeout to allow Supabase client to parse session
+      setTimeout(() => {
+        window.history.replaceState(null, '', window.location.pathname + '#/worker');
+        this.navigate('worker', false);
+      }, 300);
+      return;
+    }
+
+    // Check for PKCE query code
+    if (search.includes('code=')) {
+      const params = new URLSearchParams(search);
+      const code = params.get('code');
+      if (code) {
+        Toast.info('Authenticating', 'Verifying session token...');
+        // Clean URL search query
+        window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+      }
+    }
+  }
+
+  isRouteProtected(route) {
+    const PROTECTED_ROUTES = [
+      'profile',
+      'worker-submissions',
+      'worker-wallet',
+      'business',
+      'business-wizard',
+      'business-review',
+      'admin'
+    ];
+    return PROTECTED_ROUTES.includes(route);
+  }
+
   navigate(route, updateHash = true) {
+    // Route Protection Check
+    if (this.isRouteProtected(route) && !store.state.authenticatedUser) {
+      const routeLabels = {
+        'profile': 'Contributor Profile',
+        'worker-submissions': 'Submitted Proofs',
+        'worker-wallet': 'Earnings Wallet & Withdrawals',
+        'business': 'Business Portal',
+        'business-wizard': 'Campaign Builder',
+        'business-review': 'Proof Submissions Review',
+        'admin': 'Admin Terminal & Ledger Audit'
+      };
+
+      const requiredRole = (route.startsWith('business') || route === 'admin') ? 'business' : 'worker';
+      Toast.info('Sign In Required', `Please sign in to access ${routeLabels[route] || 'this page'}.`);
+      
+      // Prompt user with Auth Modal and pass requested route for auto-redirect on sign-in
+      AuthModal.open('login', requiredRole, route, () => {
+        this.navigate(route);
+      });
+
+      // Keep them on current safe route or default to worker marketplace
+      if (this.isRouteProtected(this.currentRoute)) {
+        this.currentRoute = 'worker';
+      }
+      this.updateNavbar();
+      this.renderCurrentView();
+      return;
+    }
+
     this.currentRoute = route;
     if (updateHash) {
       window.location.hash = `#/${route}`;

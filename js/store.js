@@ -308,15 +308,29 @@ export class AppStore {
       fullName,
       phone: meta.phone || '',
       role,
-      lastSignIn: supabaseUser.last_sign_in_at
+      lastSignIn: supabaseUser.last_sign_in_at,
+      createdAt: supabaseUser.created_at
     };
+
+    // Ensure double-entry ledger account exists for this authenticated user
+    if (this.ledger && !this.ledger.accounts[`USER_CASH:${supabaseUser.id}`]) {
+      try {
+        this.ledger.ensureAccount(`USER_CASH:${supabaseUser.id}`, `${fullName} Wallet`, 'LIABILITY');
+        // Welcome bonus for newly registered contributor or starter liquidity for business
+        const bonusAmount = role === 'business' ? 25000 : 500;
+        this.ledger.recordDeposit(supabaseUser.id, bonusAmount, 'WELCOME_REGISTRATION_BONUS');
+      } catch (e) {
+        console.warn('Ledger account initialization notice:', e);
+      }
+    }
 
     if (role === 'business') {
       this.state.businessUser = {
         ...this.state.businessUser,
         id: supabaseUser.id,
         email: supabaseUser.email,
-        name: fullName
+        name: fullName,
+        phone: meta.phone || ''
       };
       this.state.activeRole = 'business';
     } else {
@@ -324,7 +338,8 @@ export class AppStore {
         ...this.state.currentUser,
         id: supabaseUser.id,
         email: supabaseUser.email,
-        name: fullName
+        name: fullName,
+        phone: meta.phone || this.state.currentUser.phone
       };
       this.state.activeRole = 'worker';
     }

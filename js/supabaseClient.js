@@ -44,10 +44,14 @@ export async function signUpUser({ email, password, fullName, phone, role = 'wor
     throw new Error('Supabase is not configured yet. Please provide your Project URL and Anon Key.');
   }
 
+  // Ensure redirect URL returns to this exact application
+  const redirectUrl = window.location.origin + window.location.pathname;
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
+      emailRedirectTo: redirectUrl,
       data: {
         full_name: fullName,
         phone: phone,
@@ -73,6 +77,46 @@ export async function signInUser({ email, password }) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Send password reset email
+ */
+export async function resetPasswordForEmail(email) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error('Supabase is not configured yet.');
+  }
+
+  const redirectUrl = window.location.origin + window.location.pathname;
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: redirectUrl
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Resend verification email for unconfirmed accounts
+ */
+export async function resendVerificationEmail(email) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error('Supabase is not configured yet.');
+  }
+
+  const redirectUrl = window.location.origin + window.location.pathname;
+  const { data, error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: {
+      emailRedirectTo: redirectUrl
+    }
   });
 
   if (error) throw error;
