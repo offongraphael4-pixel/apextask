@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ApexTask - Modern Crowdsourcing & Microtask Marketplace</title>
+  <meta name="description" content="Next-generation crowdsourced microtask marketplace with guaranteed escrow protection, 72-hour review SLAs, and instant bank settlements.">
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Modular CSS Architecture -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/worker.css">
+  <link rel="stylesheet" href="css/business.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Navigation Bar -->
+    <header class="navbar" role="banner">
+      <div class="brand-wrapper" title="ApexTask Home">
+        <div class="brand-icon">▲</div>
+        <div>
+          <span class="brand-title">ApexTask</span>
+        </div>
+        <span class="brand-tag">Escrow Core</span>
+      </div>
+
+      <!-- Live Role Switcher -->
+      <nav class="role-nav" role="navigation" aria-label="Portal Switcher">
+        <button class="role-tab" data-role="landing">
+          <span>Overview</span>
+        </button>
+        <button class="role-tab active" data-role="worker">
+          <span>💼 Worker Portal</span>
+        </button>
+        <button class="role-tab" data-role="business">
+          <span>🏢 Business Portal</span>
+        </button>
+        <button class="role-tab" data-role="admin">
+          <span>🛡️ Admin Terminal</span>
+        </button>
+      </nav>
+
+      <!-- User & Quick Balance Chip -->
+      <div class="nav-actions">
+        <!-- Onboarding Tour Trigger -->
+        <button id="nav-tour-btn" class="btn btn-ghost btn-sm" style="font-size: 0.8rem; color: var(--primary-400);" title="Interactive Platform Tour">
+          <span>🎓 Tour</span>
+        </button>
+
+        <!-- Auth Sign In Trigger -->
+        <button id="nav-auth-btn" class="btn btn-secondary btn-sm" style="font-size: 0.8rem;" title="Sign In or Register">
+          <span>Sign In</span>
+        </button>
+
+        <!-- Notification Bell Trigger -->
+        <button id="nav-notif-btn" class="btn btn-ghost btn-sm" style="position: relative; padding: 0.5rem; border-radius: 50%; font-size: 1.15rem;" title="Notifications">
+          <span>🔔</span>
+          <span id="nav-notif-badge" style="position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--warning-400); box-shadow: 0 0 6px var(--warning-500);"></span>
+        </button>
+
+        <div id="nav-user-chip" class="user-quick-chip" title="View Contributor Profile & Trust Score">
+          <div class="user-avatar">AJ</div>
+          <div class="user-quick-balance num">
+            <span id="nav-balance-val">₦3,500</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main View Dynamic Container -->
+    <main id="view-container" class="main-content" role="main">
+      <!-- Dynamic Views Rendered Here via js/app.js -->
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-inner">
+        <div>
+          <strong style="color: #fff; font-weight: 800;">ApexTask Escrow Network</strong> • Trust-Engineered Crowdsourcing
+        </div>
+        <div class="footer-links">
+          <a href="#/worker">Marketplace</a>
+          <a href="#/business">Campaign Builder</a>
+          <a href="#/admin">Ledger Solvency</a>
+          <a href="#/profile">KYC Tier Status</a>
+        </div>
+        <div>
+          Double-Entry Ledger Verified • &copy; 2026 ApexTask Ltd.
+        </div>
+      </div>
+    </footer>
+
+    <!-- Mobile Bottom App Bar -->
+    <nav class="mobile-bottom-nav" id="mobile-bottom-nav" aria-label="Mobile Navigation">
+      <button class="mobile-nav-item active" data-nav="worker">
+        <span class="mobile-nav-icon">💼</span>
+        <span class="mobile-nav-label">Market</span>
+      </button>
+      <button class="mobile-nav-item" data-nav="worker-submissions">
+        <span class="mobile-nav-icon">📋</span>
+        <span class="mobile-nav-label">Proofs</span>
+      </button>
+      <button class="mobile-nav-item" data-nav="worker-wallet">
+        <span class="mobile-nav-icon">💳</span>
+        <span class="mobile-nav-label">Wallet</span>
+      </button>
+      <button class="mobile-nav-item" data-nav="business">
+        <span class="mobile-nav-icon">🏢</span>
+        <span class="mobile-nav-label">Business</span>
+      </button>
+      <button class="mobile-nav-item" data-nav="profile">
+        <span class="mobile-nav-icon">👤</span>
+        <span class="mobile-nav-label">Profile</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Toast Notification Stack Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- App Bootstrap Module -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
